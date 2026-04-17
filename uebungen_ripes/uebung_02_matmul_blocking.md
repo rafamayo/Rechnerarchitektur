@@ -137,16 +137,41 @@ Das Programm `matmul_naive.s` implementiert die naive Matrizenmultiplikation.
 Durch Ändern von `.equ N` wechselt man zwischen zwei Fällen:
 
 ```asm
+# ============================================================
 # matmul_naive.s  --  Naive Matrizenmultiplikation  C = A x B
 #
+# Zum Umschalten zwischen den Faellen NUR N aendern:
+#
+#   Fall 1 (N=4,  passt in Cache):  .equ N, 4
+#   Fall 2 (N=10, Thrashing):       .equ N, 10
+#
+# Cache-Konfiguration (in Ripes einstellen):
+#   16 Lines, Assoziativitaet 1, 4 Woerter/Line => 256 Bytes
+#
+# Speicherbedarf pro Matrix: N*N*4 Bytes
+#   N= 4: 3 x  64 Bytes =  192 Bytes  < 256 Bytes  => passt
+#   N=10: 3 x 400 Bytes = 1200 Bytes >> 256 Bytes  => Thrashing
+#
+# Speicherlayout:
+#   A liegt bei Adresse X
+#   B liegt bei Adresse X + 400  (= 10*10*4, groesste Matrix)
+#   C liegt bei Adresse X + 800
+#   => Abstand ist immer 400 Bytes, unabhaengig von N.
+#   => Bei N=4 liegen A[0..3][0..3], B[0..3][0..3], C[0..3][0..3]
+#      jeweils kompakt am Anfang ihres 400-Byte-Blocks.
+#
+# Register-Konventionen:
+#   s0=&A   s1=&B   s2=&C
+#   s3=i    s4=j    s5=k    s6=Akkumulator
+#   t0..t4 = temporaer
+# ============================================================
+
 # *** NUR HIER AENDERN ***
-# .equ N, 4    => Fall 1: Matrizen passen in den Cache
-# .equ N, 10   => Fall 2/3: Thrashing
 .equ N, 4
 
 .data
-A: .zero 400    # 10*10*4 = 400 Bytes (groesste unterstuetzte Matrix)
-B: .zero 400    # Abstand zwischen Matrizen immer 400 Bytes
+A: .zero 400           # 10*10*4 = 400 Bytes (groesste unterstuetzte Matrix)
+B: .zero 400
 C: .zero 400
 
 .text
@@ -155,33 +180,9 @@ _start:
     la   s1, B
     la   s2, C
 
-    # --- Initialisierung: A[i][j] = i+j,  B[i][j] = i*j ---
-    li   s3, 0
-init_i:
-    li   t0, N
-    bge  s3, t0, init_done
-    li   s4, 0
-init_j:
-    li   t0, N
-    bge  s4, t0, init_next_i
-    li   t0, N
-    mul  t1, s3, t0
-    add  t1, t1, s4
-    slli t1, t1, 2           # Byte-Offset = (i*N + j) * 4
-    add  t2, s3, s4
-    add  t3, s0, t1
-    sw   t2, 0(t3)           # A[i][j] = i + j
-    mul  t2, s3, s4
-    add  t3, s1, t1
-    sw   t2, 0(t3)           # B[i][j] = i * j
-    addi s4, s4, 1
-    j    init_j
-init_next_i:
-    addi s3, s3, 1
-    j    init_i
-init_done:
-
     # --- Matrizenmultiplikation C = A x B ---
+    # A und B enthalten Nullen (.zero) -- die Zugriffsmuster
+    # und damit die Cache-Hit-Rate sind unabhaengig von den Werten.
     li   s3, 0               # i = 0
 loop_i:
     li   t0, N
@@ -196,21 +197,21 @@ loop_k:
     li   t0, N
     bge  s5, t0, store_c
 
-    # A[i][k]: zeilenweise, Abstand +4 Bytes pro k-Schritt
+    # A[i][k]: zeilenweise, +4 Bytes pro k-Schritt
     li   t0, N
     mul  t1, s3, t0
     add  t1, t1, s5
     slli t1, t1, 2
     add  t1, s0, t1
-    lw   t3, 0(t1)           # <-- sequentieller Zugriff (gut)
+    lw   t3, 0(t1)
 
-    # B[k][j]: spaltenweise, Abstand +N*4 Bytes pro k-Schritt
+    # B[k][j]: spaltenweise, +N*4 Bytes pro k-Schritt
     li   t0, N
     mul  t1, s5, t0
     add  t1, t1, s4
     slli t1, t1, 2
     add  t1, s1, t1
-    lw   t4, 0(t1)           # <-- Sprung-Zugriff (problematisch!)
+    lw   t4, 0(t1)
 
     mul  t3, t3, t4
     add  s6, s6, t3
@@ -397,18 +398,23 @@ Die äußeren Schleifen `ii, jj, kk` wählen den aktiven Block. Die inneren Schl
 ### Das Programm
 
 ```asm
-# matmul_blocked.s  --  Cache-Blocking  C = A x B
+# ============================================================
+# matmul_blocked.s  --  Cache-Blocking (Tiling)  C = A x B
 #
-# Cache (Ripes): 16 Lines, Assoz. 1, 4 Woerter/Line = 256 Bytes
-# N = 10,  BLOCK = 4
-# Blockgroesse: 3 x 4x4 x 4 = 192 Bytes < 256 Bytes => passt!
+# Cache-Konfiguration (in Ripes, unveraendert wie Fall 1/2):
+#   16 Lines, Assoziativitaet 1, 4 Woerter/Line => 256 Bytes
 #
-# Register:
+# Blockgroesse BLOCK=4 ist auf den Cache abgestimmt:
+#   3 x BLOCK x BLOCK x 4 Bytes = 3 x 64 = 192 Bytes < 256 Bytes
+#   => Drei Bloecke passen gleichzeitig in den Cache.
+#
+# Register-Konventionen:
 #   s0=&A   s1=&B   s2=&C
-#   s3=ii   s4=jj   s5=kk     (Block-Schleifen, Schritt BLOCK)
-#   s6=i    s7=j    s8=k      (innere Schleifen)
+#   s3=ii   s4=jj   s5=kk        (Block-Schleifen)
+#   s6=i    s7=j    s8=k         (innere Schleifen)
 #   s9=Akkumulator
 #   t0..t4 = temporaer
+# ============================================================
 
 .equ N,     10
 .equ BLOCK,  4
@@ -424,33 +430,9 @@ _start:
     la   s1, B
     la   s2, C
 
-    # --- Initialisierung: A[i][j] = i+j, B[i][j] = i*j ---
-    li   s3, 0
-init_i:
-    li   t0, N
-    bge  s3, t0, init_done
-    li   s4, 0
-init_j:
-    li   t0, N
-    bge  s4, t0, init_next_i
-    li   t0, N
-    mul  t1, s3, t0
-    add  t1, t1, s4
-    slli t1, t1, 2
-    add  t2, s3, s4
-    add  t3, s0, t1
-    sw   t2, 0(t3)
-    mul  t2, s3, s4
-    add  t3, s1, t1
-    sw   t2, 0(t3)
-    addi s4, s4, 1
-    j    init_j
-init_next_i:
-    addi s3, s3, 1
-    j    init_i
-init_done:
-
-    # --- Cache-Blocking ---
+    # --- Cache-Blocking: aeussere Schleifen ueber Bloecke ---
+    # A und B enthalten Nullen (.zero) -- die Zugriffsmuster
+    # und damit die Cache-Hit-Rate sind unabhaengig von den Werten.
     li   s3, 0               # ii = 0
 loop_ii:
     li   t0, N
@@ -463,18 +445,20 @@ loop_jj:
 loop_kk:
     li   t0, N
     bge  s5, t0, next_jj
+
+    # --- Innere Schleifen: arbeiten innerhalb eines BLOCK x BLOCK Bereichs ---
     mv   s6, s3              # i = ii
 loop_i:
     li   t0, BLOCK
     add  t0, s3, t0
-    bge  s6, t0, next_kk
+    bge  s6, t0, next_kk     # i >= ii+BLOCK
     mv   s7, s4              # j = jj
 loop_j:
     li   t0, BLOCK
     add  t0, s4, t0
-    bge  s7, t0, next_i
+    bge  s7, t0, next_i      # j >= jj+BLOCK
 
-    # C[i][j] laden (akkumulierter Wert)
+    # C[i][j] laden (akkumulierter Wert aus vorherigen kk-Runden)
     li   t0, N
     mul  t1, s6, t0
     add  t1, t1, s7
@@ -486,7 +470,7 @@ loop_j:
 loop_k:
     li   t0, BLOCK
     add  t0, s5, t0
-    bge  s8, t0, store_c
+    bge  s8, t0, store_c     # k >= kk+BLOCK
 
     # A[i][k]
     li   t0, N
@@ -494,7 +478,7 @@ loop_k:
     add  t1, t1, s8
     slli t1, t1, 2
     add  t1, s0, t1
-    lw   t3, 0(t1)           # Block im Cache -> meist HIT
+    lw   t3, 0(t1)
 
     # B[k][j]
     li   t0, N
@@ -502,7 +486,7 @@ loop_k:
     add  t1, t1, s7
     slli t1, t1, 2
     add  t1, s1, t1
-    lw   t4, 0(t1)           # Block im Cache -> meist HIT
+    lw   t4, 0(t1)
 
     mul  t3, t3, t4
     add  s9, s9, t3
@@ -536,8 +520,7 @@ next_ii:
 
 done:
     li   a7, 10
-    ecall
-```
+    ecall```
 
 ### Versuch 5 – Cache-Blocking, originaler Cache
 
