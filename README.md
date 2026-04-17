@@ -1,2 +1,2 @@
 # Rechnerarchitektur
-"Rechnerarchitektur" im Bachelorstudiengang Informatik / Hochschule Kempten 
+Lehrveranstaltung "Rechnerarchitektur" im Bachelorstudiengang Informatik / Hochschule Kempten 
