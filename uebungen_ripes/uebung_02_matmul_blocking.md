@@ -2,8 +2,7 @@
 
 **Lehrveranstaltung:** Rechnerarchitektur  
 **Thema:** Zugriffsmuster, Kapazitätsmisses und cache-aware Algorithmen  
-**Werkzeug:** [Ripes RISC-V Simulator](https://github.com/mortbopet/Ripes)  
-**Voraussetzung:** Übung 01 – Cache-Konflikte und Assoziativität
+**Werkzeug:** [Ripes RISC-V Simulator](https://github.com/mortbopet/Ripes)
 
 ---
 
@@ -90,13 +89,13 @@ for (i = 0; i < N; i++)
 ```
 Feste Werte: i und j sind konstant, k läuft von 0 bis N-1
 
-A[i][k]:  i=const, k=0,1,2,...   →  Adressen: &A[i][0], &A[i][1], ...
+A[i][k]:  i=const, k=0,1,2,...          →  Adressen: &A[i][0], &A[i][1], ...
           Abstand pro Schritt: 4 Bytes  →  ZEILENWEISE (sequentiell, gut!)
 
-B[k][j]:  j=const, k=0,1,2,...   →  Adressen: &B[0][j], &B[1][j], ...
+B[k][j]:  j=const, k=0,1,2,...            →  Adressen: &B[0][j], &B[1][j], ...
           Abstand pro Schritt: N*4 Bytes  →  SPALTENWEISE (Sprünge, schlecht!)
 
-C[i][j]:  i,j=const               →  immer dieselbe Adresse  →  1 Miss, dann Hits
+C[i][j]:  i,j=const                       →  immer dieselbe Adresse  →  1 Miss, dann Hits
 ```
 
 ### Visualisierung der Zugriffsmuster (N=4, Beispiel)
@@ -105,7 +104,7 @@ C[i][j]:  i,j=const               →  immer dieselbe Adresse  →  1 Miss, dann
 Matrix A im Speicher (zeilenweise):        Zugriff A[1][k], k=0..3:
 ┌────┬────┬────┬────┐                      ↓    ↓    ↓    ↓
 │ 00 │ 01 │ 02 │ 03 │  Zeile 0             □    □    □    □   keine Zugriffe
-│ 10 │ 11 │ 12 │ 13 │  Zeile 1   →  →  →  ■    ■    ■    ■   sequentiell ✓
+│ 10 │ 11 │ 12 │ 13 │  Zeile 1    →  →  →  ■    ■    ■    ■   sequentiell ✓
 │ 20 │ 21 │ 22 │ 23 │  Zeile 2             □    □    □    □
 │ 30 │ 31 │ 32 │ 33 │  Zeile 3             □    □    □    □
 └────┴────┴────┴────┘
@@ -121,8 +120,8 @@ Matrix B im Speicher (zeilenweise):        Zugriff B[k][1], k=0..3:
 │ 30 │ 31 │ 32 │ 33 │  Zeile 3             □    ■    □    □   ← k=3
 └────┴────┴────┴────┘
 Speicher: [00][01][02][03][10][11][12][13][20]...
-               ↑              ↑  Abstand: N*4 = 16 Bytes pro Schritt
-               B[0][1]        B[1][1]     = 1 Cache-Line bei 4 Wörtern/Line
+               ↑               ↑  Abstand: N*4 = 16 Bytes pro Schritt
+               B[0][1]         B[1][1]         = 1 Cache-Line bei 4 Wörtern/Line
 ```
 
 Bei N=10: Abstand pro k-Schritt = **40 Bytes = 2.5 Cache-Lines**.
@@ -249,7 +248,7 @@ Setzen Sie `.equ N, 4` und konfigurieren Sie den Data Cache:
 
 **Speicherbedarf:** 3 × 4×4 × 4 Bytes = **192 Bytes < 256 Bytes** ✓
 
-Simulieren Sie und notieren Sie die Hit-Rate: ______
+Simulieren Sie und **notieren Sie die Hit-Rate**
 
 ### Versuch 2 – N=10, naiv, gleicher Cache
 
@@ -257,7 +256,7 @@ Setzen Sie `.equ N, 10`, Cache-Konfiguration **unverändert**.
 
 **Speicherbedarf:** 3 × 10×10 × 4 Bytes = **1200 Bytes >> 256 Bytes**
 
-Simulieren Sie und notieren Sie die Hit-Rate: ______
+Simulieren Sie und **notieren Sie die Hit-Rate**
 
 ### Versuch 3 – N=10, größerer Cache (Lösung A)
 
@@ -275,7 +274,7 @@ Mit 32 Lines passt B vollständig in den Cache. Nach dem ersten
 Durchlauf der j-Schleife (k=0..9 für j=0) sind alle B-Lines geladen
 und bleiben verfügbar.
 
-Simulieren Sie und notieren Sie die Hit-Rate: ______
+Simulieren Sie und **notieren Sie die Hit-Rate**
 
 ### Versuch 4 – N=10, höhere Assoziativität (Lösung B)
 
@@ -288,16 +287,16 @@ Setzen Sie `.equ N, 10`, Cache-Konfiguration ändern:
 | Wörter/Line | 4 |
 | **Kapazität** | **256 Bytes** (gleich wie Versuch 2!) |
 
-Simulieren Sie und notieren Sie die Hit-Rate: ______
+Simulieren Sie und **notieren Sie die Hit-Rate**
 
 ### Ergebnistabelle
 
 | Versuch | N | Cache | Hit-Rate |
 |---------|---|-------|----------|
-| 1 | 4  | 16 Lines, Assoz. 1, 256 B | ~92% |
-| 2 | 10 | 16 Lines, Assoz. 1, 256 B | ~70% |
-| 3 | 10 | **32 Lines**, Assoz. 1, **512 B** | ~?% |
-| 4 | 10 | 8 Lines, **Assoz. 2**, 256 B | ~?% |
+| 1 | 4  | 16 Lines, Assoz. 1, 256 B |      |
+| 2 | 10 | 16 Lines, Assoz. 1, 256 B |     |
+| 3 | 10 | **32 Lines**, Assoz. 1, **512 B** |     |
+| 4 | 10 | 8 Lines, **Assoz. 2**, 256 B |     |
 
 ---
 
@@ -358,10 +357,10 @@ Bedingung: 3 × S² × 4 Bytes ≤ Cache-Kapazität
 ```
 Naiver Algorithmus (N=10):
 ┌──────────────────────────┐   ┌──────────────────────────┐
-│ A  →  →  →  →  →  →  → │   │ B  ↓  □  □  □  □  □  □  │
-│    →  →  →  →  →  →  → │   │    ↓  □  □  □  □  □  □  │
-│    →  →  →  →  →  →  → │   │    ↓  □  □  □  □  □  □  │
-│    ...                  │   │    ↓  □  □  □  □  □  □  │
+│ A  →  →  →  →  →  →  →   │   │ B  ↓  □  □  □  □  □  □   │
+│    →  →  →  →  →  →  →   │   │    ↓  □  □  □  □  □  □   │
+│    →  →  →  →  →  →  →   │   │    ↓  □  □  □  □  □  □   │
+│    ...                   │   │    ↓  □  □  □  □  □  □   │
 └──────────────────────────┘   └──────────────────────────┘
 A: sequentiell (gut)           B: spaltenweise Sprünge (schlecht)
 Gesamter Cache wird durch B überflutet → Thrashing
@@ -383,19 +382,17 @@ Innerhalb jedes Blocks: fast nur Hits.
 ### Schleifenstruktur
 
 ```
-Naiv:           Cache-Blocking:
-for i           for ii (Schritte: BLOCK)
-  for j           for jj (Schritte: BLOCK)
-    for k           for kk (Schritte: BLOCK)
-      C+=A*B            for i (ii..ii+BLOCK)
-                          for j (jj..jj+BLOCK)
-                            for k (kk..kk+BLOCK)
-                              C+=A*B
+Naiv:                 Cache-Blocking:
+for i                 for ii (Schritte: BLOCK)
+  for j                 for jj (Schritte: BLOCK)
+    for k                 for kk (Schritte: BLOCK)
+      C+=A*B                  for i (ii..ii+BLOCK)
+                                for j (jj..jj+BLOCK)
+                                  for k (kk..kk+BLOCK)
+                                    C+=A*B
 ```
 
-Die äußeren Schleifen `ii, jj, kk` wählen den aktiven Block.
-Die inneren Schleifen `i, j, k` arbeiten **komplett innerhalb des Blocks**,
-der im Cache liegt.
+Die äußeren Schleifen `ii, jj, kk` wählen den aktiven Block. Die inneren Schleifen `i, j, k` arbeiten **komplett innerhalb des Blocks**, der im Cache liegt.
 
 ### Das Programm
 
@@ -553,7 +550,7 @@ Laden Sie `matmul_blocked.s`. Cache-Konfiguration **zurück auf Versuch 2**:
 | Wörter/Line | 4 |
 | **Kapazität** | **256 Bytes** |
 
-Simulieren Sie und notieren Sie die Hit-Rate: ______
+Simulieren Sie und **notieren Sie die Hit-Rate**
 
 ---
 
@@ -563,11 +560,11 @@ Simulieren Sie und notieren Sie die Hit-Rate: ______
 
 | Versuch | N | Cache | Algorithmus | Hit-Rate |
 |---------|---|-------|-------------|----------|
-| 1 | 4  | 256 B, Assoz. 1 | naiv    | ~92% |
-| 2 | 10 | 256 B, Assoz. 1 | naiv    | ~70% |
-| 3 | 10 | **512 B**, Assoz. 1 | naiv  | ~?%  |
-| 4 | 10 | 256 B, **Assoz. 2** | naiv  | ~?%  |
-| 5 | 10 | 256 B, Assoz. 1 | **Blocking** | ~?%  |
+| 1 | 4  | 256 B, Assoz. 1 | naiv    |      |
+| 2 | 10 | 256 B, Assoz. 1 | naiv    |      |
+| 3 | 10 | **512 B**, Assoz. 1 | naiv  |      |
+| 4 | 10 | 256 B, **Assoz. 2** | naiv  |      |
+| 5 | 10 | 256 B, Assoz. 1 | **Blocking** |      |
 
 ### Visualisierung: Woher kommen die Misses?
 
